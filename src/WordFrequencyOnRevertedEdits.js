@@ -3,7 +3,7 @@
  * @author: [[User:Helder.wiki]]
  * @tracking: [[Special:GlobalUsage/User:Helder.wiki/Tools/WordFrequencyOnRevertedEdits.js]] ([[File:User:Helder.wiki/Tools/WordFrequencyOnRevertedEdits.js]])
  */
-/*jshint browser: true, camelcase: true, curly: true, eqeqeq: true, immed: true, latedef: true, newcap: true, noarg: true, noempty: true, nonew: true, quotmark: true, undef: true, unused: true, strict: true, trailing: true, maxlen: 120, evil: true, onevar: true */
+/*jshint browser: true, camelcase: true, curly: true, eqeqeq: true, immed: true, latedef: true, newcap: true, noarg: true, noempty: true, nonew: true, quotmark: true, undef: true, unused: true, strict: true, trailing: true, maxlen: 120, evil: true, onevar: true, laxbreak: true */
 /*global jQuery, mediaWiki */
 ( function ( mw, $ ) {
 'use strict';
@@ -27,8 +27,8 @@ function processDiffs( diffs ) {
 		} else {
 			return null;
 		}
-	} )
-	sorted = sorted.sort(function(a,b){ console.log(a,b); return b.frequency-a.frequency});
+	} );
+	sorted = sorted.sort(function(a,b){ return b.frequency-a.frequency; });
 
 	for( i = 0; i < sorted.length; i++ ){
 		$target
@@ -38,14 +38,20 @@ function processDiffs( diffs ) {
 }
 
 function getDiffs( revids ) {
+	var str, i;
+	str = revids[0].toString();
+	for( i = 1; i < revids.length && i < 500 && str.length < 255; i++ ){
+		str += '|' + revids[i];
+	}
 	( new mw.Api() ).get( {
 		action: 'query',
 		prop: 'revisions',
 		rvdiffto: 'prev',
-		revids: revids.join( '|' ),
+		revids: str,
 		indexpageids: true
 	} )
 	.done( function ( data ) {
+		// console.log( data );
 		var i, pIds = data.query.pageids,
 			diffs = [];
 		for( i = 0; i < pIds.length; i++ ){
@@ -55,12 +61,13 @@ function getDiffs( revids ) {
 	} );
 }
 
-function getList( page ) {
+function getList() {
 	( new mw.Api() ).get( {
 		action: 'query',
 		list: 'usercontribs',
-		uclimit: 50,
-		ucuser: 'Salebot'
+		uclimit: 'max',
+		ucuser: 'Salebot',
+		ucprop: 'ids|comment'
 	} )
 	.done( function ( data ) {
 		var i, contribs = data.query.usercontribs,
