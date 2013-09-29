@@ -3,53 +3,132 @@
  * @author: [[User:Helder.wiki]]
  * @tracking: [[Special:GlobalUsage/User:Helder.wiki/Tools/WordFrequencyOnRevertedEdits.js]] ([[File:User:Helder.wiki/Tools/WordFrequencyOnRevertedEdits.js]])
  */
-/*jshint browser: true, camelcase: true, curly: true, eqeqeq: true, immed: true, latedef: true, newcap: true, noarg: true, noempty: true, nonew: true, quotmark: true, undef: true, unused: true, strict: true, trailing: true, maxlen: 120, evil: true, onevar: true, laxbreak: true */
+/*jshint browser: true, camelcase: true, curly: true, eqeqeq: true, immed: true, latedef: true, newcap: true, noarg: true, noempty: true, nonew: true, quotmark: true, undef: true, unused: true, strict: true, trailing: true, maxlen: 120, evil: true, onevar: true, laxbreak: true, devel:true, forin: false*/
 /*global jQuery, mediaWiki */
 ( function ( mw, $ ) {
 'use strict';
 
+/* Translatable strings */
+mw.messages.set( {
+	'wf-intro': 'Os dados abaixo foram obtidos por um script',
+	'wf-table-caption': 'Palavras mais frequentes nas edições revertidas por $1',
+	'wf-table-word': 'Palavra',
+	'wf-table-reverted': 'Reversões',
+	'wf-table-used': 'Usos',
+	'wf-link': 'Palavras mais revertidas',
+	'wf-link-description': 'Gerar estatísticas sobre as palavras mais ' +
+		'usadas nas edições revertidas',
+	'wf-user-prompt': 'Deseja analisar as reversões de que usuário? (exemplos: $1, etc)',
+	'wf-regex': '(?:bot: revertidas|\\[\\[WP:REV\\|Revertidas\\]\\]) edições|Desfeita a edição'
+} );
+ 
 var sampleSize = 5000,
-	// Testar também com o Salebot
-	user = 'Stuckkey';
+	users = [ 'Stuckkey', 'Salebot', mw.config.get( 'wgUserName' ) ],
+	user;
+
+function showWikiTable( table, caption ) {
+	var wikicode = mw.msg( 'wf-intro' ) +
+			'\n{| class="wikitable sortable"\n|+ ' + caption,
+		columns = [],
+		colKey, i, j, cell, row;
+	for( colKey in table[0] ){
+		columns.push( colKey );
+	}
+	for( i = 0; i < table.length; i++ ){
+		cell = i === 0 ? '!' : '|';
+		row = '\n|-';
+		for( j = 0; j < columns.length; j++ ){
+			row += '\n' + cell + ' ' + table[i][ columns[j] ];
+		}
+		wikicode += row;
+	}
+	wikicode += '\n|}';
+	$( '#mw-content-text' )
+		.prepend(
+			'<textarea cols="80" rows="10" style="width: 100%; font-family: monospace; line-height: 1.5em;">' +
+				mw.html.escape( wikicode ) +
+			'</textarea>'
+		);
+}
+
+function showTable( table, caption ) {
+	var $tbody = $( '<tbody>' ),
+		$table = $( '<table class="wikitable sortable">' ),
+		columns = [],
+		colKey, i, j, $row, cell;
+	for( colKey in table[0] ){
+		columns.push( colKey );
+	}
+	for( i = 0; i < table.length; i++ ){
+		cell = i === 0 ? '<th>' : '<td>';
+		$row = $( '<tr>' );
+		for( j = 0; j < columns.length; j++ ){
+			$row.append(
+				$( cell ).text( table[i][ columns[j] ] )
+			);
+		}
+		$tbody.append( $row );
+	}
+	$( '#mw-content-text' )
+		.prepend(
+			$table.append(
+				$( '<caption>' ).text( caption ),
+				$tbody
+			)
+		);
+	mw.loader.using( 'jquery.tablesorter', function () {
+		$table.tablesorter();
+	} );
+}
 
 function processDiffs( diffs ) {
-	var $list = $( '<ul>' ),
-		freq = {},
-		i, w, diffText, words, sorted;
+	var table = {},
+		used, i, w, diffText, words, sorted;
 	for( i = 0; i < diffs.length; i++ ){
 		diffText = $( diffs[i] )
 			.find( '.diff-deletedline .diffchange' )
 			.text();
 		words = diffText.split( /[^a-záàâãçéêíñóôõúü\'ºª\-]/i );
+		used = {};
 		for( w = 0; w < words.length; w++ ){
 			if( words[w].length ) {
-				freq[ words[w] ] = ( freq[ words[w] ] || 0 ) + 1;
+				used[ words[w] ] = ( used[ words[w] ] || 0 ) + 1;
+			}
+		}
+		for( w in used ){
+			if( table[ w ] ){
+				table[ w ].used += used[ w ];
+				table[ w ].reverted++;
+			} else {
+				table[ w ] = {
+					reverted: 1,
+					used: used[ w ]
+				};
 			}
 		}
 	}
-	sorted = $.map( freq, function( count, word ) {
-		if( count > 1 ) {
-			return { word: word, frequency: count };
-		} else {
-			return null;
+	sorted = $.map( table, function( info, word ) {
+		if( info.used > 1 ) {
+			return {
+				word: word,
+				reverted: info.reverted,
+				used: info.used
+			};
 		}
+		return null;
 	} );
-	sorted = sorted.sort(function(a,b){ return b.frequency-a.frequency; });
- 
-	for( i = 0; i < sorted.length; i++ ){
-		$list.append(
-			$( '<li>' ).text(
-				sorted[i].word + ': ' + sorted[i].frequency
-			)
-		);
-	}
-	$( '#mw-content-text' )
-		.empty()
-		.append(
-			$( '<p>' )
-				.text( 'Palavras mais frequentes nas edições revertidas por ' + user + ':' )
-		)
-		.append( $list );
+	sorted = sorted.sort( function( a, b ){
+		return b.reverted - a.reverted;
+	} );
+	// Insert the headers at the beginning of the list
+	sorted.splice(0, 0, {
+		word: mw.msg( 'wf-table-word' ),
+		reverted: mw.msg( 'wf-table-reverted' ),
+		used:  mw.msg( 'wf-table-used' )
+	});
+	showTable( sorted, mw.msg( 'wf-table-caption', user ) );
+	showWikiTable( sorted, mw.msg( 'wf-table-caption', user ) );
+	$.removeSpinner( 'wf-spinner' );
 }
 
 function getDiffs( revIds ) {
@@ -83,13 +162,16 @@ function getDiffs( revIds ) {
 		getBatch = function () {
 			params.revids = getBatchOfIds();
 			( new mw.Api() ).get( params )
-				.done( processBatch );
-			
+				.done( processBatch )
+				.fail( function () {
+					$.removeSpinner( 'wf-spinner' );
+				} );
 		};
 	getBatch();
 }
 
 function getList() {
+	$( '#firstHeading' ).find('span').injectSpinner( 'wf-spinner' );
 	( new mw.Api() ).get( {
 		action: 'query',
 		list: 'usercontribs',
@@ -99,24 +181,49 @@ function getList() {
 	} )
 	.done( function ( data ) {
 		var i, contribs = data.query.usercontribs,
-			reversionIds = [];
+			reversionIds = [],
+			revRegex = new RegExp( mw.message( 'wf-regex' ).plain() );
 		for( i = 0; i < contribs.length; i++ ){
-			if( contribs[i].comment.match( /(?:bot: revertidas|\[\[WP:REV\|Revertidas\]\]) edições/ ) ){
+			if( contribs[i].comment.match( revRegex ) ){
 				reversionIds.push( contribs[i].revid );
 			}
 		}
 		// if( reversionIds.length < sampleSize ){
 			// Get more edits
 		// }
+		if( !reversionIds.length ){
+			$.removeSpinner( 'wf-spinner' );
+			return;
+		}
 		getDiffs( reversionIds );
+	} )
+	.fail( function () {
+		$.removeSpinner( 'wf-spinner' );
 	} );
 }
 
-if( mw.config.get( 'wgAction' ) === 'view'
-	&& mw.config.get( 'wgCanonicalSpecialPageName' ) === 'Blankpage'
-	&& mw.config.get( 'wgTitle' ).match( /\/WordFrequencyOnRevertedEdits$/ )
-) {
-	mw.loader.using( [ 'mediawiki.api' ], getList );
+function addWordFrequencyLink (){
+	$( mw.util.addPortletLink(
+		'p-cactions',
+		'#',
+		mw.msg( 'wf-link' ),
+		'ca-reverted-words',
+		mw.msg( 'wf-link-description' )
+	) ).click( function(e){
+		e.preventDefault();
+		user = prompt( mw.msg( 'wf-user-prompt', users.join( ', ' ) ), users[0] );
+		if( !user ){
+			return;
+		}
+		mw.loader.using( [
+			'mediawiki.api',
+			'jquery.spinner'
+		], getList );
+	} );
+}
+
+if( mw.config.get( 'wgAction' ) === 'view' ){
+	$( addWordFrequencyLink );
 }
 
 }( mediaWiki, jQuery ) );
