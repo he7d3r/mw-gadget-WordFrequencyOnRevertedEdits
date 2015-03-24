@@ -7,18 +7,33 @@
 'use strict';
 
 	/* Translatable strings */
-	mw.messages.set( {
-		'wf-intro': 'Os dados abaixo foram obtidos por um script',
-		'wf-table-caption': 'Palavras mais frequentes nas edições revertidas por $1',
-		'wf-table-word': 'Palavra',
-		'wf-table-reverted': 'Reversões',
-		'wf-table-used': 'Usos',
-		'wf-link': 'Palavras mais revertidas',
-		'wf-link-description': 'Gerar estatísticas sobre as palavras mais ' +
-			'usadas nas edições revertidas',
-		'wf-user-prompt': 'Deseja analisar as reversões de que usuário? (exemplos: $1, etc)',
-		'wf-regex': '(?:bot: revertidas|\\[\\[WP:REV\\|Revertidas\\]\\]) edições|Desfeita a edição'
-	} );
+	var i18n = {
+		'en': {
+			'wf-intro': 'The data below was obtained by a script',
+			'wf-table-caption': 'Most frequent words in the edits reverted by $1',
+			'wf-table-word': 'Word',
+			'wf-table-reverted': 'Reverts',
+			'wf-table-used': 'Uses',
+			'wf-link': 'Most reverted words',
+			'wf-link-description': 'Generate statistics about the most used words' +
+				'on reverted edits',
+			'wf-user-prompt': 'Do you want to analyze the reverts done by which user? (examples: $1, etc)',
+			'wf-regex': '(?:reverted|RV)'
+		},
+		'pt-br': {
+			'wf-intro': 'Os dados abaixo foram obtidos por um script',
+			'wf-table-caption': 'Palavras mais frequentes nas edições revertidas por $1',
+			'wf-table-word': 'Palavra',
+			'wf-table-reverted': 'Reversões',
+			'wf-table-used': 'Usos',
+			'wf-link': 'Palavras mais revertidas',
+			'wf-link-description': 'Gerar estatísticas sobre as palavras mais ' +
+				'usadas nas edições revertidas',
+			'wf-user-prompt': 'Deseja analisar as reversões de que usuário? (exemplos: $1, etc)',
+			'wf-regex': '(?:bot: revertidas|\\[\\[WP:REV\\|Revertidas\\]\\]) edições|Desfeita a edição'
+		}
+	};
+	mw.messages.set( i18n[ mw.config.get( 'wgUserLanguage' ) ] || i18n.en );
 
 	var sampleSize = 5000,
 		users = [ 'Stuckkey', 'Salebot', mw.config.get( 'wgUserName' ) ],
